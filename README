@@ -1,0 +1,219 @@
+This is a customizable RPA primer sets designing system.
+######
+Introduction:
+  Firstly, program identifies all candiate single primer/probe regions. Then those single primers/probes are aligned to target genomes and background genomes. Thirdly, program combines candidate single primers/probes into RPA primer sets. At last the commonality and specificity check are calculated for RPA primer sets with the information from alignment. 
+######
+SYSTEM REQUIREMENTS:
+Program now runs under Linux operation system, it needs perl and gcc.
+######
+OTHER SOFTWARES MAY BE NEEDED
+Bowtie2, which could be downloaded from http://bowtie-bio.sourceforge.net/bowtie2/index.shtml
+######
+Files and Directories:
+This system is packaged in one file, "RPA.tar.gz", which can be downloaded from https://github.com/jiqingxiaoxi/RPA.git. Important files inside this tar.gz file are listed here. 
+
+|-Par/
+     tm_nn_parameter.txt	Parameters for calculating Tm.
+     stab_parameter.txt		Parameters for calculating the stability of single primers.
+     *.db, *.ds			Sixteen files for calculating the secondary structure of primers.
+|-par.pl			Get the information of positions and mismatches for each single primer.
+|-single.c			The program to identify single primer/probe regions.
+|-RPA.c				The program to design RPA primer sets.
+|-Makefile			Makefile for program.
+|-bowtie2/
+     bowtie2			The bowtie2 program
+     bowtie2-build		The bowtie2 index build program
+|-example/
+     example.fa			Sequences as example, from "NC_002951.2 Staphylococcus aureus subsp. aureus COL chromosome".
+     target-list.txt		The list of names from target genomes. It contains 3 strains of S. aureus.
+     background-list.txt	The list of names from background genomes. It contains 3 strains of other bacteria.
+     index.*			The index files for Bowtie2 software.
+######
+INSTALLATION:
+  tar -zxvf RPA.tar.gz
+  make
+######
+QUICK START:
+1. If you want design RPA primers for a sequence without taking care of commonality and specificity:
+  cd RPA/
+  ./Single -in example/example.fa -out Test
+    (Two files "Primer/Test" and "Probe/Test" are created.)
+  ./RPA -in Test -ref example/example.fa -out success.txt
+    (Ten RPA primer sets are designed successfully stored in "success.txt" file.)
+
+2. If you want design common RPA primers without taking care of specificity:
+  cd RPA/
+  ./Single -in example/example.fa -out Test
+    (Two files "Primer/Test" and "Probe/Test" are created.)
+  perl par.pl --in Test --ref example/example.fa --bowtie2 bowtie2/bowtie2 --index example/index --common example/target-list.txt
+    (Three files "Primer/Test-common_list.txt", "Primer/Test-common.txt" and "Probe/Test-common.txt" are created.)
+  ./RPA -in Test -ref example/example.fa -out success.txt -common
+    (Ten RPA primer sets are designed successfully stored in "success.txt" file.)
+
+3. If you want design specific RPA primers without taking care of commonality:
+  cd RPA/
+  ./Single -in example/example.fa -out Test
+    (Two files "Primer/Test" and "Probe/Test" are created.)
+  perl par.pl --in Test --ref example/example.fa --bowtie2 bowtie2/bowtie2 --index example/index --specific example/background-list.txt       
+    (Two files "Primer/Test-specific.txt" and "Probe/Test-specific.txt" are created.)                        
+  ./RPA -in Test -ref example/example.fa -out success.txt -specific        
+    (Ten RPA primer sets are designed successfully stored in "success.txt" file.)
+
+4. If you want design common and specific RPA primers:
+   cd RPA/
+  ./Single -in example/example.fa -out Test
+    (Two files "Primer/Test" and "Probe/Test" are created.)
+  perl par.pl --in Test --ref example/example.fa --bowtie2 bowtie2/bowtie2 --index example/index --common example/target-list.txt --left
+    (Five files "Primer/Test-common_list.txt", "Primer/Test-common.txt", "Primer/Test-specific.txt", "Probe/Test-common.txt" and "Probe/Test-specific.txt" are created.)
+  ./RPA -in Test -ref example/example.fa -out success.txt -common -specific
+    (Ten RPA primer sets are designed successfully stored in "success.txt" file.)
+######
+RUN THE SYSTEM:
+1.Identify candidate single primer regions:
+Command:
+  Single -in <ref_genome> -out <single_primers> [options]*
+
+Arguments:
+  -in <ref_genome>
+    reference genome, fasta formate
+  -out <single_primers>
+    output the candidate single primers
+  -dir <directory>
+    the directory for output file
+    default: current directory
+  -NoExo
+    don't identifiy candidate exo probe
+    default:identifiy candidate exo probe
+  -NoCheck
+    don't check secondary structure of primers or probes
+    default: check secondary structure
+  -par <par_directory>
+    parameter files under the directory are used to check primers' secondary structure
+    default: GLAPD/Par/
+  -h[-help]
+    print usage
+
+2.Align sequences from single primer regions(optional):
+Command:
+  perl par.pl --in <sinlge_primers_file> --ref <ref_genome> --common[--specific] <genomes_list> --bowtie2 <bowtie2> --index <database> [options]*
+
+Arguments:
+  --in <input_name>
+    the file name of candidate single primer/probe, files are generated from Single program
+  --ref <ref_genome>
+    reference genome, fasta formate
+  --dir <directory>
+    dirctory for files of candidate single primer/probe regions
+    default: current directory
+  --NoProbe
+    without exo probe
+  --common <genomes_list>
+    the genomes in the file(target genomes) are expected to be amplified by RPA primer sets
+  --specific <genomes_list>
+    the genomes in the file(background genomes) are not expected to be amplified by RPA primer sets
+  --left
+    background_group = all_genome_in_database - target_group
+    used with --common
+    invalid if exist --specific
+  --bowtie2 <bowtie2>
+    the bowtie2 program
+  --index <database>
+    bowtie2 index file name, comma-separated
+  --Primer_s <int>
+    the max number of mismatches allowed when align single primers to background genomes
+    the bigger of the value, the more specific
+    default: 4
+  --Primer_c <int>
+    the max number of mismatches allowed when align single primers to target genomes
+    the smaller of the value, the more common
+    default: 0
+  --Probe_s <int>
+    the max number of mismatches allowed when align probe to background genomes
+    the bigger of the value, the more specific
+    default: 3
+  --Probe_c <int>
+    the max number of mismatches allowed when align probe to target genomes
+    the smaller of the value, the more common
+    default: 0
+  --threads <int>
+    number of threads to launch when align
+    default: 1
+  --help|--h
+    print help information
+
+3.Design RPA primer sets:
+Command:
+  RPA -in <sinlge_primers_file> -ref <ref_genome> -out <RPA_primer_sets> [options]*
+
+Arguments:
+  -in <input_name>
+    the file name of candidate single primer/probe regions, files are generated from Single program
+  -ref <ref_genome>
+    reference genome, fasta formate
+  -dir <directory>
+    the directory for output file
+    default: current directory
+  -out <RPA_primer_sets>
+    output successfully designed RPA primer sets
+  -num <int>
+    the expected output number of RPA primer sets
+    default: 10
+  -NoProbe
+    without exo probe
+  -common
+    design common RPA primer sets those can amplify more than one target genomes
+  -specific
+    design specific RPA primer sets those can't amplify any background genomes
+  -check <int>
+    check primers' tendency of binding to another in one PRA primer set or not
+    0: don't check; other values: check
+    default: 1
+  -par <par_directory>
+    parameter files under the directory are used to check primers' binding tendency
+    default: Par/
+  -h/-help
+    print usage
+######
+INPUT FILE FORMAT:
+1) The reference genome must be fasta format.
+2) The common list file and specific list file used in step 2 must be one genome name per line. They can be generated by taking the sequence names from target or background genomes directly.
+3) The bowtie2 index can be generated by "bowtie2-build" command, more details in http://bowtie-bio.sourceforge.net/bowtie2/manual.shtml.
+OUTPUT FILE FORMAT:
+1) In the files generated by "Single" program, each line means a candidate single primer/probe. For example:
+	"pos:3   length:25       +:1     -:0     61.89"
+   Each line has five fields seperated by tabs. From left to right, the fields are:
+   1. The position of the single primer/probe in reference genome (0-based)
+   2. The length of the single primer/probe
+   3,4. "+" means the primer/probe from the plus strand of reference genome and "-" means the primer/probe from minus strand. If the number is "0", the single primer/probe isn't from the plus or minus strand of reference genome. 
+   5. Tm
+   6. G-content, only in Probe file
+2) In the files generated by "par.pl" ("XX-common.txt" and "XX-specific.txt), each line stores an alignment. For example:
+	"3       25      2       501407  1       0"
+   Each line has six fields seperated by tabs. From left to right, the fields are:
+   1. The position of the single primer in reference genome (0-based)
+   2. The length of the single primer
+   3. The genome turn in target group or background group (0-based)
+   4. The position of alignment in this genome(field 3)
+   5. "1" means this single primer can be used to amplify the genome (field 3)in plus strand. "0" means this single primer can't be used to amplify the genome (field 3) in plus strand.
+   6. "1" means this single primer can be used to amplify the genome (field 3) in minus strand. "0" means this single primer can't be used to amplify the genome (field 3) in minus strand.
+3) In the file generated by "par.pl" ("XX-common_list.txt"), each line contains one target genome. For example:
+	"NC_002951.2     0"
+   Each line has two fields seperated by tab. From left to right, the fields are:
+   1. The name of target genome
+   2. The turn of target genome in target group (0-based)
+4) The RPA primer set is stored in the file generated by "RPA" program, for example:
+	"The 1 RPA primers:
+	  Forward: pos:0,length:30 bp, primer(5'-3'):GTAATATATATCTTGCCGTGCTAGGTGGGG
+	  Reverse: pos:71,length:30 bp, primer(5'-3'):CAAAAATACGGCCTCAACAAAGGAATTAAG
+	  Probe: pos:49,length:49 bp, primer(5'-3'):AAATACGGCCTCAACAAAGGAATTAAGCCTCGCATAAAGCGGATTTCGA
+	  This set of RPA primers could be used in 3 genomes, there are: NC_002951.2, NC_017340.1, NC_002745.2
+   One RPA primer set contains two primers and/or a probe. The positions of single primer/probe in reference genome and their length, sequence are listed in this file. When user designs common primers, which target genomes can be amplified by this primer set are also listed in this file.
+######
+TIPS:
+1) Select reference genome:
+  The reference genome can be select one randomly from the group of target genomes, or the most expected genome amplified by the RPA primer set.
+2) Specific file:
+  When run the step 2, if you have the "common file", you can use "--left" option to replace the "--specific". In this way, all genomes in database expect for those in "common file" are defined as the background genomes.
+######
+If you have any questions, please contact with us:
+Ben Jia: creek0501@126.com
