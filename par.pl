@@ -23,6 +23,7 @@ my $seq="";
 my $value;
 my $begin;
 my $stop;
+my %ignore;
 
 my $line;
 my @array;
@@ -391,6 +392,10 @@ for($i=0;$i<@list_index;$i++)
 			print COMMON "$pos\t$len\t$common{$flag}\t$array[3]\t$status[2]\t$status[3]\n";
 			next;
 		}
+		if(exists $common{$flag})
+		{
+			next;
+		}
 		if($mismatch>$par_PrimerSpecific)
 		{
 			next;
@@ -465,6 +470,76 @@ if($common_file)
 if($specific_file || $left)
 {
 	close SPECIFIC;
+###ignore some region
+	$file[0]=$dir."Primer/".$prefix;
+	open(IN,"<$file[0]") or die "Can't open $file[0] file!\n";
+	$file[1]=$file[0].".fa";
+	open(OUT,">$file[1]") or die "Can't create $file[1] file!\n";
+	$name=-1;
+	while(<IN>)
+	{
+	        $line=$_;
+		($pos)=$line=~/pos\:(\d+)\t/;
+		if($pos==$name)
+		{
+			next;
+		}
+		$name=$pos;
+	        $primer=substr($seq,$pos,200);
+	        print OUT ">$pos\n$primer\n";
+	}
+	close IN;
+	close OUT;
+
+        $file[4]=$file[0]."-ignore.txt";
+        open(IGNORE,">$file[4]") or die "Can't create $file[4] file!\n";
+
+	##run bowtie2
+	for($i=0;$i<@list_index;$i++)
+	{
+	        $file[5]=$file[0]."-".$i.".sam";
+	        system("$path_bowtie2 -f -a --omit-sec-seq --no-unal -p $thread -x $list_index[$i] -U $file[1] -S $file[5]");
+
+	        open(BOWTIE,"<$file[5]") or die "Can't open the $file[5] file!\n";
+	        while(<BOWTIE>)
+	        {
+	                $line=$_;
+	                @array=split("\t",$line);
+	                if(@array<9)
+	                {
+	                        next;
+	                }
+	                if($array[5]=~/[ID]/)
+	                {
+	                        next;
+	                }
+			($mismatch)=$line=~/NM:i:(\d+)/;
+			if($mismatch>0)
+			{
+				next;
+			}
+	                if(length($array[2])<=300)
+	                {
+	                        $flag=$array[2];
+	                }
+	                else
+	                {
+	                        $flag=substr($array[2],0,300);
+	                }
+	                if(exists $specific{$flag})
+                	{
+				$ignore{$array[0]}=1;
+			}
+		}
+		close BOWTIE;
+		system("rm $file[5]");
+	}
+	foreach $name (sort{$a<=>$b} keys %ignore)
+	{
+		print IGNORE "$name\n";
+	}
+	close IGNORE;
+	system("rm $file[1]");
 }
 $end=time();
 $take=$end-$start;
@@ -615,7 +690,10 @@ for($i=0;$i<@list_index;$i++)
 			}
                         next;
                 }
-
+		if(exists $common{$flag})
+		{
+			next;
+		}
                 if($mismatch>$par_ProbeSpecific)
                 {
                         next;

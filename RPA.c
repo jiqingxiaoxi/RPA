@@ -2438,6 +2438,7 @@ struct Primer
 	int plus;
 	int minus;
 	int total;  //how many GIs can be used
+	int ignore; //for fast specific design
 	float Tm;
 	struct ExoProbe *other;
 	struct Primer *next;
@@ -2974,6 +2975,8 @@ void main(int argc,char **argv)
 				continue;
 			if(p_F->plus==0)
 				continue;
+			if((flag[6]==1)&&(p_F->ignore==1))
+				continue;
 			success=check_add(p_F->pos,best_par,expect); 
 			if(success==0)
 				continue;
@@ -3281,6 +3284,7 @@ struct Primer *read_parPrimer(char *path,int common_flag,int specific_flag)
 		new_primer->other=NULL;
 		new_primer->common=NULL;
 		new_primer->specific=NULL;
+		new_primer->ignore=0;
 
 		if(i==0)
 		{
@@ -3493,6 +3497,43 @@ struct Primer *read_parPrimer(char *path,int common_flag,int specific_flag)
                 free(data);
                 free(store);
                 free(temp);
+
+	//ignore info
+		i=strlen(path);
+                in=(char *)malloc(i+20);
+                memset(in,'\0',i+20);
+                strcpy(in,path);
+                strcat(in,"-ignore.txt"); //suffix of parameter
+                if(access(in,0)==-1)
+                {
+                        printf("Error! Don't have the %s file!\n",in);
+                        exit(1);
+                }
+
+                fp=fopen(in,"r");
+                if(fp==NULL)
+                {
+                        printf("Error: can't open the %s file!\n",in);
+                        exit(1);
+                }
+		p_primer=head;
+                while(fscanf(fp,"%d\n",&pos)!=EOF)
+                {
+			while(p_primer)
+			{
+				if(p_primer->pos<pos)
+				{
+					p_primer=p_primer->next;
+					continue;
+				}
+				if(p_primer->pos>pos)
+					break;
+				p_primer->ignore=1;
+				p_primer=p_primer->next;
+			}
+                }
+                fclose(fp);
+                free(in);
 	}
 	return head;
 }
